@@ -1,4 +1,6 @@
 
+#include "math\types.h"
+
 //
 // NOTE: Memory functions
 //
