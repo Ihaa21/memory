@@ -41,16 +41,21 @@ inline mm GetAlignOffset(mm Address, mm Alignment)
 inline mm GetAlignOffset(void* Address, mm Alignment)
 {
     mm AddressMm = mm(Address);
-    mm Result = ((AddressMm + (Alignment-1)) & ~(Alignment-1)) - AddressMm;
+    mm Result = GetAlignOffset(AddressMm, Alignment);
     return Result;
 }
 
 inline mm AlignAddress(mm Address, mm Alignment)
 {
-    Assert(Alignment != 0);
     // IMPORTANT: We assume a power of 2 alignment
-    mm Result = (Address + (Alignment-1)) & ~(Alignment-1);
+    mm Result = Address + GetAlignOffset(Address, Alignment);
 
+    return Result;
+}
+
+inline mm AlignAddress(void* Address, mm Alignment)
+{
+    mm Result = mm(Address) + GetAlignOffset(mm(Address), Alignment);
     return Result;
 }
 
