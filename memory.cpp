@@ -32,9 +32,15 @@ inline u8* ShiftPtrByBytes_(u8* Ptr, mm Step)
     return Result;
 }
 
-inline mm GetAlignOffset(mm Address, mm Alignment)
+inline u32 GetAlignOffset(u32 Address, u32 Alignment)
 {
-    mm Result = ((Address + (Alignment-1)) & ~(Alignment-1)) - Address;
+    u32 Result = ((Address + (Alignment-1)) & ~(Alignment-1)) - Address;
+    return Result;
+}
+
+inline u64 GetAlignOffset(u64 Address, u64 Alignment)
+{
+    u64 Result = ((Address + (Alignment-1)) & ~(Alignment-1)) - Address;
     return Result;
 }
 
@@ -45,10 +51,18 @@ inline mm GetAlignOffset(void* Address, mm Alignment)
     return Result;
 }
 
-inline mm AlignAddress(mm Address, mm Alignment)
+inline u32 AlignAddress(u32 Address, u32 Alignment)
 {
     // IMPORTANT: We assume a power of 2 alignment
-    mm Result = Address + GetAlignOffset(Address, Alignment);
+    u32 Result = Address + GetAlignOffset(Address, Alignment);
+
+    return Result;
+}
+
+inline u64 AlignAddress(u64 Address, u64 Alignment)
+{
+    // IMPORTANT: We assume a power of 2 alignment
+    u64 Result = Address + GetAlignOffset(Address, Alignment);
 
     return Result;
 }
@@ -63,7 +77,7 @@ inline mm AlignAddress(void* Address, mm Alignment)
 // NOTE: Linear arena
 //
 
-inline linear_arena LinearArenaInit(void* Mem, mm Size)
+inline linear_arena LinearArenaCreate(void* Mem, mm Size)
 {
     linear_arena Result = {};
     Result.Size = Size;
@@ -137,6 +151,8 @@ inline linear_arena LinearSubArena(linear_arena* Arena, mm Size)
 //
 // NOTE: Double linear arena
 //
+
+// TODO: Double check this
 
 inline linear_double_arena InitDoubleArena(void* Mem, mm Size)
 {
@@ -224,7 +240,7 @@ inline void ArenaClear(block_arena* Arena)
     }
 }
 
-inline block_arena BlockArenaInit(void* Mem, mm BlockSize, mm NumBlocks)
+inline block_arena BlockArenaCreate(void* Mem, mm BlockSize, mm NumBlocks)
 {
     Assert(BlockSize >= sizeof(block_header));
     
@@ -244,7 +260,7 @@ inline block_arena BlockSubArena(linear_arena* Arena, mm BlockSize, mm NumBlocks
     block_arena Result = {};
 
     void* Mem = (u8*)PushSize(Arena, BlockSize*NumBlocks);
-    Result = BlockArenaInit(Mem, BlockSize, NumBlocks);
+    Result = BlockArenaCreate(Mem, BlockSize, NumBlocks);
 
     return Result;
 }
