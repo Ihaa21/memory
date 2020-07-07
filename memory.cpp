@@ -108,19 +108,14 @@ inline void EndTempMem(temp_mem TempMem)
     TempMem.Arena->Used = TempMem.Used;
 }
 
-#define MemoryExpand_(X) X
+#define PushStruct(Arena, Type) (Type*)PushSizeAligned(Arena, sizeof(Type), 0)
+#define PushStructAligned(Arena, Type, Alignment) (Type*)PushSizeAligned(Arena, sizeof(Type), Alignment)
 
-#define PushStruct3(Arena, Type, Alignment) (Type*)PushSize(Arena, sizeof(Type), Alignment)
-#define PushStruct2(Arena, Type) (Type*)PushSize(Arena, sizeof(Type))
-#define PushStructOverload_(_1,_2,_3,NAME,...) NAME
-#define PushStruct(...) MemoryExpand_(PushStructOverload_(__VA_ARGS__, PushStruct3, PushStruct2)(__VA_ARGS__))
+#define PushArray(Arena, Type, Count) (Type*)PushSizeAligned(Arena, sizeof(Type)*(Count), 0)
+#define PushArrayAligned(Arena, Type, Count, Alignment) (Type*)PushSizeAligned(Arena, sizeof(Type)*(Count), Alignment)
 
-#define PushArray4(Arena, Type, Count, Alignment) (Type*)PushSize(Arena, sizeof(Type)*(Count), Alignment)
-#define PushArray3(Arena, Type, Count) (Type*)PushSize(Arena, sizeof(Type)*(Count))
-#define PushArrayOverload_(_1,_2,_3,_4,NAME,...) NAME
-#define PushArray(...) MemoryExpand_(PushArrayOverload_(__VA_ARGS__, PushArray4, PushArray3)(__VA_ARGS__))
-
-inline void* PushSize(linear_arena* Arena, mm Size, mm Alignment = 4)
+#define PushSize(Arena, Size) PushSizeAligned(Arena, Size, 0)
+inline void* PushSizeAligned(linear_arena* Arena, mm Size, mm Alignment)
 {
     // IMPORTANT: Default Alignment = 4 since ARM requires it
     // IMPORTANT: Its assumed the memory in this allocator is aligned to the highest alignment we will need
@@ -152,6 +147,7 @@ inline linear_arena LinearSubArena(linear_arena* Arena, mm Size)
 // NOTE: Double linear arena
 //
 
+#if 0
 // TODO: Double check this
 
 inline linear_double_arena InitDoubleArena(void* Mem, mm Size)
@@ -211,6 +207,8 @@ inline void* BotPushSize(linear_double_arena* Arena, mm Size)
     
     return Result;
 }
+
+#endif
 
 //
 // NOTE: Block Arena
