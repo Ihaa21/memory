@@ -14,7 +14,7 @@ inline void ZeroMem(void* Mem, mm Size)
     }
 }
 
-inline void Copy(void* Mem, void* Dest, mm Size)
+inline void Copy(const void* Mem, void* Dest, mm Size)
 {
     u8* CurrentByte = (u8*)Mem;
     u8* DestByte = (u8*)Dest;
@@ -34,18 +34,21 @@ inline u8* ShiftPtrByBytes_(u8* Ptr, mm Step)
 
 inline u32 GetAlignOffset(u32 Address, u32 Alignment)
 {
+    Assert(Alignment != 0);
     u32 Result = ((Address + (Alignment-1)) & ~(Alignment-1)) - Address;
     return Result;
 }
 
 inline u64 GetAlignOffset(u64 Address, u64 Alignment)
 {
+    Assert(Alignment != 0);
     u64 Result = ((Address + (Alignment-1)) & ~(Alignment-1)) - Address;
     return Result;
 }
 
 inline mm GetAlignOffset(void* Address, mm Alignment)
 {
+    Assert(Alignment != 0);
     mm AddressMm = mm(Address);
     mm Result = GetAlignOffset(AddressMm, Alignment);
     return Result;
@@ -108,13 +111,13 @@ inline void EndTempMem(temp_mem TempMem)
     TempMem.Arena->Used = TempMem.Used;
 }
 
-#define PushStruct(Arena, Type) (Type*)PushSizeAligned(Arena, sizeof(Type), 0)
+#define PushStruct(Arena, Type) (Type*)PushSizeAligned(Arena, sizeof(Type), 1)
 #define PushStructAligned(Arena, Type, Alignment) (Type*)PushSizeAligned(Arena, sizeof(Type), Alignment)
 
-#define PushArray(Arena, Type, Count) (Type*)PushSizeAligned(Arena, sizeof(Type)*(Count), 0)
+#define PushArray(Arena, Type, Count) (Type*)PushSizeAligned(Arena, sizeof(Type)*(Count), 1)
 #define PushArrayAligned(Arena, Type, Count, Alignment) (Type*)PushSizeAligned(Arena, sizeof(Type)*(Count), Alignment)
 
-#define PushSize(Arena, Size) PushSizeAligned(Arena, Size, 0)
+#define PushSize(Arena, Size) PushSizeAligned(Arena, Size, 1)
 inline void* PushSizeAligned(linear_arena* Arena, mm Size, mm Alignment)
 {
     // IMPORTANT: Default Alignment = 4 since ARM requires it
