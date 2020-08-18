@@ -14,6 +14,7 @@ inline void ZeroMem(void* Mem, mm Size)
     }
 }
 
+#define CopyArray(Mem, Dest, Type, Count) Copy(Mem, Dest, sizeof(Type)*(Count))
 inline void Copy(const void* Mem, void* Dest, mm Size)
 {
     u8* CurrentByte = (u8*)Mem;
@@ -133,6 +134,30 @@ inline void* PushSizeAligned(linear_arena* Arena, mm Size, mm Alignment)
     DebugRecordAllocation(Arena);
 #endif
     
+    return Result;
+}
+
+#define PushString(Arena, String) PushStringAligned(Arena, String, 1)
+inline char* PushStringAligned(linear_arena* Arena, char* String, mm Alignment)
+{
+    char* Result = 0;
+    
+    mm AlignedOffset = AlignAddress(Arena->Used, Alignment);
+    Assert(AlignedOffset <= Arena->Size);
+    Result = (char*)(Arena->Mem + AlignedOffset);
+
+    char* SrcChar = String;
+    char* DstChar = Result;
+    while (*SrcChar != 0)
+    {
+        *DstChar++ = *SrcChar++;
+    }
+    *DstChar++ = 0;
+
+    mm StringSize = mm(DstChar - Result);
+    Assert(AlignedOffset + StringSize <= Arena->Size);
+    Arena->Used = AlignedOffset + StringSize;
+
     return Result;
 }
 
