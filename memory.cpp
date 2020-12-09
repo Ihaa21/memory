@@ -5,6 +5,19 @@
 // NOTE: Memory functions
 //
 
+inline void* MemoryAllocate(mm AllocSize)
+{
+    void* Result = VirtualAlloc(0, AllocSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    return Result;
+}
+
+inline void MemoryFree(void* Mem)
+{
+    BOOL Result = VirtualFree(Mem, 0, MEM_RELEASE);
+    DWORD Error = GetLastError();
+    Assert(Result);
+}
+
 inline void ZeroMem(void* Mem, mm Size)
 {
     u8* CurrByte = (u8*)Mem;
@@ -78,6 +91,51 @@ inline mm AlignAddress(void* Address, mm Alignment)
 }
 
 //
+// NOTE: Data Structure Macros
+//
+
+#define LinkedListSentinelCreate(Sentinel)      \
+    {                                           \
+        (Sentinel).Prev = &(Sentinel);          \
+        (Sentinel).Next = &(Sentinel);          \
+    }
+
+#define LinkedListSentinelAppend(Sentinel, NewElement)  \
+    {                                                   \
+        (NewElement)->Prev = (Sentinel).Prev;           \
+        (NewElement)->Next = &(Sentinel);               \
+        (NewElement)->Next->Prev = NewElement;          \
+        (NewElement)->Prev->Next = NewElement;          \
+    }
+
+#define LinkedListSentinelRemove(RemoveElement)                 \
+    {                                                           \
+        (RemoveElement)->Next->Prev = (RemoveElement)->Prev;    \
+        (RemoveElement)->Prev->Next = (RemoveElement)->Next;    \
+    }
+
+#define LinkedListSentinelFirst(Sentinel)       \
+    ((Sentinel).Next)
+
+#define LinkedListSentinelLast(Sentinel)        \
+    ((Sentinel).Prev)
+
+#define LinkedListSentinelEmpty(Sentinel)       \
+    ((Sentinel).Prev == &(Sentinel))
+
+//
+// NOTE: Memory Alloc Macros
+//
+
+#define PushStruct(Arena, Type) (Type*)PushSizeAligned(Arena, sizeof(Type), 1)
+#define PushStructAligned(Arena, Type, Alignment) (Type*)PushSizeAligned(Arena, sizeof(Type), Alignment)
+
+#define PushArray(Arena, Type, Count) (Type*)PushSizeAligned(Arena, sizeof(Type)*(Count), 1)
+#define PushArrayAligned(Arena, Type, Count, Alignment) (Type*)PushSizeAligned(Arena, sizeof(Type)*(Count), Alignment)
+
+#define PushSize(Arena, Size) PushSizeAligned(Arena, Size, 1)
+
+//
 // NOTE: Linear arena
 //
 
@@ -91,9 +149,15 @@ inline linear_arena LinearArenaCreate(void* Mem, mm Size)
     return Result;
 }
 
-inline void ArenaClear(linear_arena* Arena)
+inline void LinearArenaClear(linear_arena* Arena)
 {
     Arena->Used = 0;
+}
+
+inline mm LinearArenaGetRemainingSize(linear_arena* Arena)
+{
+    mm Result = Arena->Size - Arena->Used;
+    return Result;
 }
 
 inline temp_mem BeginTempMem(linear_arena* Arena)
@@ -112,13 +176,6 @@ inline void EndTempMem(temp_mem TempMem)
     TempMem.Arena->Used = TempMem.Used;
 }
 
-#define PushStruct(Arena, Type) (Type*)PushSizeAligned(Arena, sizeof(Type), 1)
-#define PushStructAligned(Arena, Type, Alignment) (Type*)PushSizeAligned(Arena, sizeof(Type), Alignment)
-
-#define PushArray(Arena, Type, Count) (Type*)PushSizeAligned(Arena, sizeof(Type)*(Count), 1)
-#define PushArrayAligned(Arena, Type, Count, Alignment) (Type*)PushSizeAligned(Arena, sizeof(Type)*(Count), Alignment)
-
-#define PushSize(Arena, Size) PushSizeAligned(Arena, Size, 1)
 inline void* PushSizeAligned(linear_arena* Arena, mm Size, mm Alignment)
 {
     // IMPORTANT: Default Alignment = 4 since ARM requires it
@@ -172,71 +229,167 @@ inline linear_arena LinearSubArena(linear_arena* Arena, mm Size)
 }
 
 //
-// NOTE: Double linear arena
+// NOTE: Dynamic Arena
 //
 
-#if 0
-// TODO: Double check this
-
-inline linear_double_arena InitDoubleArena(void* Mem, mm Size)
+inline mm DynamicArenaGetBlockSize(mm AllocSize)
 {
-    linear_double_arena Result = {};
-    Result.Size = Size;
-    Result.UsedTop = 0;
-    Result.UsedBot = 0;
-    Result.Mem = (u8*)Mem;
+    // NOTE: We allocate to nearest page size, so +1 to fit the header
+    // TODO: Get page size on other platforms here
+    mm PageSize = KiloBytes(4);
+    mm NumPages = mm(CeilF32(f32(AllocSize) / f32(PageSize))) + 1;
+    mm Result = PageSize * NumPages;
 
     return Result;
 }
 
-inline void ClearArena(linear_double_arena* Arena)
+inline dynamic_arena_header* DynamicArenaAllocHeader(mm Size)
 {
-    Arena->UsedTop = 0;
-    Arena->UsedBot = 0;
+    mm AllocSize = DynamicArenaGetBlockSize(Size);
+    dynamic_arena_header* Result = (dynamic_arena_header*)MemoryAllocate(AllocSize);
+    Result->Used = sizeof(dynamic_arena_header);
+    Result->Size = AllocSize;
+
+    return Result;
 }
 
-inline temp_double_mem BeginTempMem(linear_double_arena* Arena)
+inline dynamic_arena DynamicArenaCreate(mm MinBlockSize)
 {
-    // NOTE: This function lets us take all memory allocated past this point and later
-    // free it
-    temp_double_mem TempMem = {};
-    TempMem.Arena = Arena;
-    TempMem.UsedTop = Arena->UsedTop;
-    TempMem.UsedBot = Arena->UsedBot;
+    dynamic_arena Result = {};
+    Result.MinBlockSize = MinBlockSize;
 
-    return TempMem;
+    return Result;
 }
 
-inline void EndTempMem(temp_double_mem TempMem)
+// TODO: Make size/used be hidden? Or just don't use push to put the header, it complicates eveyrthing
+inline mm DynamicArenaHeaderGetSize(dynamic_arena_header* Header)
 {
-    TempMem.Arena->UsedTop = TempMem.UsedTop;
-    TempMem.Arena->UsedBot = TempMem.UsedBot;
+    mm Result = Header->Used - sizeof(*Header);
+    return Result;
 }
 
-inline void* PushSize(linear_double_arena* Arena, mm Size)
+inline void* DynamicArenaHeaderGetData(dynamic_arena_header* Header)
 {
-    Assert(Arena->UsedTop + Arena->UsedBot + Size <= Arena->Size);
-    void* Result = Arena->Mem + Arena->UsedTop;
-    Arena->UsedTop += Size;
+    // TODO: We don't take into account alignment here, its probably better to move headers to the bottom so alignment is more predictable
+    void* Result = (void*)(Header + 1);
+    return Result;
+}
 
-    // TODO: Do we just wanna zero everything out?
+inline void* PushSizeAligned(dynamic_arena* Arena, mm Size, mm Alignment = 4)
+{
+    void* Result = 0;
+    dynamic_arena_header* Header = Arena->Prev;
     
-    return Result;
-}
+    // IMPORTANT: Default Alignment = 4 since ARM requires it
+    mm AlignedOffset = Header ? AlignAddress(Header->Used, Alignment) : 0;
+    if (!Header || (AlignedOffset + Size) > Header->Size)
+    {
+        // NOTE: Allocate a new block
+        dynamic_arena_header* NewHeader = DynamicArenaAllocHeader(Max(Size, Arena->MinBlockSize));
 
-#define BotPushStruct(Arena, type) (type*)BotPushSize(Arena, sizeof(type))
-#define BotPushArray(Arena, type, count) (type*)BotPushSize(Arena, sizeof(type)*count)
-inline void* BotPushSize(linear_double_arena* Arena, mm Size)
-{
-    Assert(Arena->UsedTop + Arena->UsedBot + Size <= Arena->Size);
-    Arena->UsedBot += Size;
-    void* Result = Arena->Mem + Arena->Size - Arena->UsedBot;
-    // TODO: Do we just wanna zero everything out?
+        // NOTE: Append to linked list
+        if (Arena->Prev)
+        {
+            NewHeader->Prev = Arena->Prev;
+            Arena->Prev->Next = NewHeader;
+        }
+        Arena->Prev = NewHeader;
+        if (!Arena->Next)
+        {
+            Arena->Next = NewHeader;
+        }
+        
+        Header = NewHeader;
+        AlignedOffset = AlignAddress(Header->Used, Alignment);
+    }
+
+    // NOTE: Suballocate a page
+    u8* BasePtr = (u8*)Header;
+    Result = BasePtr + AlignedOffset;
+    Header->Used = AlignedOffset + Size;
     
-    return Result;
-}
-
+#if DEBUG_MEMORY_PROFILING
+    DebugRecordAllocation(Arena);
 #endif
+
+    return Result;
+}
+
+inline void ArenaClear(dynamic_arena* Arena)
+{
+    for (dynamic_arena_header* Header = Arena->Next;
+         Header;
+         )
+    {
+        dynamic_arena_header* CurrHeader = Header;
+        Header = Header->Next;
+
+        // NOTE: Remove from linked list
+        if (CurrHeader->Prev)
+        {
+            CurrHeader->Prev->Next = CurrHeader->Next;
+        }
+        else
+        {
+            Arena->Prev = 0;
+        }
+        if (CurrHeader->Next)
+        {
+            CurrHeader->Next->Prev = CurrHeader->Prev;
+        }
+        else
+        {
+            Arena->Next = 0;
+        }
+        
+        MemoryFree(CurrHeader);
+    }
+}
+
+inline dynamic_temp_mem BeginTempMem(dynamic_arena* Arena)
+{
+    dynamic_temp_mem Result = {};
+    Result.Arena = Arena;
+    Result.Header = Arena->Prev;
+    Result.Used = Result.Header ? Result.Header->Used : 0;
+
+    return Result;
+};
+
+inline void EndTempMem(dynamic_temp_mem TempMem)
+{
+    dynamic_arena_header* Header = TempMem.Arena->Prev;
+    while(Header != TempMem.Header)
+    {
+        dynamic_arena_header* CurrHeader = Header;
+        Header = Header->Prev;
+
+        // NOTE: Remove from linked list
+        if (CurrHeader->Prev)
+        {
+            CurrHeader->Prev->Next = CurrHeader->Next;
+        }
+        else
+        {
+            TempMem.Arena->Prev = 0;
+        }
+        if (CurrHeader->Next)
+        {
+            CurrHeader->Next->Prev = CurrHeader->Prev;
+        }
+        else
+        {
+            TempMem.Arena->Next = 0;
+        }
+
+        MemoryFree(CurrHeader);
+    }
+
+    if (Header)
+    {
+        Header->Used = TempMem.Used;
+    }
+}
 
 //
 // NOTE: Block Arena
