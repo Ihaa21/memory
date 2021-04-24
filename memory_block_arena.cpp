@@ -219,8 +219,16 @@ inline void* FreeSize()
 
 inline void ArenaClear(block_arena* Arena)
 {
-    // IMPORTANT: We assume the platform arena was already cleared
-    Assert(!Arena->PlatformArena->Next);
+    // NOTE: Free all allocated blocks (unless platform arena already cleared)
+    if (Arena->PlatformArena->Next)
+    {
+        for (block* CurrBlock = Arena->Next; CurrBlock; CurrBlock = Arena->Next)
+        {
+            DoubleListRemove(Arena, CurrBlock, Next, Prev);
+            PlatformBlockArenaFree(Arena->PlatformArena, CurrBlock);
+        }
+    }
+    
     Arena->Next = 0;
     Arena->Prev = 0;
     Arena->LastBlockUsed = 0;
