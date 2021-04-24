@@ -47,6 +47,7 @@ inline block* PlatformBlockArenaAllocate(platform_block_arena* Arena)
         Result = CurrPlatformHeader->FreeBlocks;
         FreeListRemove(CurrPlatformHeader->FreeBlocks, Result, Next, Prev);
         *Result = {};
+        Result->ParentBlock = CurrPlatformHeader;
     }
     else
     {

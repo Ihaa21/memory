@@ -121,7 +121,7 @@ inline mm AlignAddress(void* Address, mm Alignment)
     }                                               \
 
 #define DoubleListRemove(List, Element, Next, Prev) \
-    if (CurrHeader->Prev)                           \
+    if ((Element)->Prev)                            \
     {                                               \
         (Element)->Prev->Next = (Element)->Next;    \
     }                                               \
