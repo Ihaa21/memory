@@ -121,29 +121,23 @@ inline mm AlignAddress(void* Address, mm Alignment)
     }                                               \
 
 #define DoubleListRemove(List, Element, Next, Prev) \
-    if ((Element)->Prev)                            \
+    if (!(Element)->Prev)                           \
+    {                                               \
+        (List)->Next = (Element)->Next;             \
+    }                                               \
+    else                                            \
     {                                               \
         (Element)->Prev->Next = (Element)->Next;    \
-        if (!(Element)->Next)                       \
-        {                                           \
-            (List)->Prev = (Element)->Prev;         \
-        }                                           \
     }                                               \
-    if ((Element)->Next)                            \
+    if (!(Element)->Next)                           \
+    {                                               \
+        (List)->Prev = (Element)->Prev;             \
+    }                                               \
+    else                                            \
     {                                               \
         (Element)->Next->Prev = (Element)->Prev;    \
-        if (!(Element)->Prev)                       \
-        {                                           \
-            (List)->Next = (Element)->Next;         \
-        }                                           \
     }                                               \
-    if (!(Element)->Prev && !(Element)->Next)       \
-    {                                               \
-        (List)->Prev = 0;                           \
-        (List)->Next = 0;                           \
-    }                                               \
-
-
+         
 //
 // NOTE: Linked List Sentinel Macros
 //
