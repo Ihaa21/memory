@@ -115,6 +115,8 @@ inline void PlatformBlockArenaFree(platform_block_arena* Arena, block* Block)
         // NOTE: This platform block is completely empty so we can free it
 
         // NOTE: Unlink from list of platform blocks
+        DoubleListRemove(Arena, PlatformHeader, Next, Prev);
+#if 0
         // TODO: Make this a macro
         if (PlatformHeader->Prev)
         {
@@ -133,7 +135,8 @@ inline void PlatformBlockArenaFree(platform_block_arena* Arena, block* Block)
         {
             Arena->Next = 0;
         }
-
+#endif
+        
         // NOTE: Unlink from list of platform free blocks
         if (PlatformHeader->FreeNext)
         {
@@ -182,7 +185,7 @@ inline void ArenaClear(platform_block_arena* Arena)
 
 inline mm BlockArenaGetBlockSize(block_arena* Arena)
 {
-    mm Result = Arena->PlatformArena->BlockSize - sizeof(block);
+    mm Result = Arena->BlockSpace;
     return Result;
 }
 
@@ -190,6 +193,16 @@ inline block_arena BlockArenaCreate(platform_block_arena* PlatformArena)
 {
     block_arena Result = {};
     Result.PlatformArena = PlatformArena;
+    Result.BlockSpace = (PlatformArena->BlockSize - sizeof(block));
+
+    return Result;
+}
+
+inline block_arena BlockArenaCreate(platform_block_arena* PlatformArena, mm ElementSize)
+{
+    block_arena Result = {};
+    Result.PlatformArena = PlatformArena;
+    Result.BlockSpace = ((PlatformArena->BlockSize - sizeof(block)) / ElementSize) * ElementSize;
 
     return Result;
 }
@@ -199,7 +212,7 @@ inline void* PushSizeAligned(block_arena* Arena, mm Size, mm Alignment = 4)
     Assert(Size <= BlockArenaGetBlockSize(Arena));
     
     mm NewUsed = AlignAddress(Arena->LastBlockUsed, Alignment) + Size;
-    if (NewUsed > Arena->PlatformArena->BlockSize || !Arena->Next)
+    if (NewUsed > (Arena->BlockSpace + sizeof(block)) || !Arena->Next)
     {
         // NOTE: Allocate a new block, no more empty space in arena
         block* NewBlock = PlatformBlockArenaAllocate(Arena->PlatformArena);

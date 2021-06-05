@@ -124,17 +124,22 @@ inline mm AlignAddress(void* Address, mm Alignment)
     if ((Element)->Prev)                            \
     {                                               \
         (Element)->Prev->Next = (Element)->Next;    \
-    }                                               \
-    else                                            \
-    {                                               \
-        (List)->Prev = 0;                           \
+        if (!(Element)->Next)                       \
+        {                                           \
+            (List)->Prev = (Element)->Prev;         \
+        }                                           \
     }                                               \
     if ((Element)->Next)                            \
     {                                               \
         (Element)->Next->Prev = (Element)->Prev;    \
+        if (!(Element)->Prev)                       \
+        {                                           \
+            (List)->Next = (Element)->Next;         \
+        }                                           \
     }                                               \
-    else                                            \
+    if (!(Element)->Prev && !(Element)->Next)       \
     {                                               \
+        (List)->Prev = 0;                           \
         (List)->Next = 0;                           \
     }                                               \
 

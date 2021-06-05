@@ -62,6 +62,7 @@ struct block_arena
     block* Prev;
 
     mm LastBlockUsed;
+    mm BlockSpace; // NOTE: Use this incase we want padding at the end of our block
     platform_block_arena* PlatformArena;
 };
 
